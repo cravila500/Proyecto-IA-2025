@@ -1,0 +1,72 @@
+import csv
+import pandas as pd
+import re
+import string
+
+# Cargar el dataset manualmente (evita errores CSV)
+rows = []
+with open('training.1600000.processed.noemoticon.csv', 'r', encoding='latin-1') as archivo:
+    lector = csv.reader(archivo)
+    for linea in lector:
+        if len(linea) == 6:
+            rows.append(linea)
+
+# Crear DataFrame
+df = pd.DataFrame(rows, columns=['target', 'ids', 'date', 'flag', 'user', 'text'])
+
+# Simplificar etiquetas: 0 → negativo, 2 → neutro, 4 → positivo
+def simplificar_sentimiento(valor):
+    if valor == '0':
+        return "negativo"
+    elif valor == '2':
+        return "neutro"
+    else:
+        return "positivo"
+
+df['target'] = df['target'].apply(simplificar_sentimiento)
+
+# Stopwords simples
+stopwords = set([
+    'the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were', 'be', 'to', 'of',
+    'in', 'on', 'for', 'at', 'by', 'this', 'that', 'with', 'as', 'i', 'you',
+    'he', 'she', 'it', 'we', 'they', 'them', 'my', 'your', 'me'
+])
+
+# Función para limpiar y tokenizar texto
+def limpiar_texto(texto):
+    texto = texto.lower()
+    texto = re.sub(r"http\S+", "", texto)
+    texto = re.sub(r"@\w+", "", texto)
+    texto = re.sub(r"#\w+", "", texto)
+    texto = re.sub(rf"[{re.escape(string.punctuation)}]", "", texto)
+    texto = re.sub(r"\d+", "", texto)
+    palabras = texto.split()
+    palabras = [p for p in palabras if p not in stopwords]
+    return palabras
+
+# Aplicar limpieza
+df['tokens'] = df['text'].apply(limpiar_texto)
+
+# Eliminar tweets vacíos o con menos de 3 palabras
+df = df[df['tokens'].apply(lambda x: len(x) >= 3)]
+
+# Convertir tokens en texto plano
+df['texto_limpio'] = df['tokens'].apply(lambda tokens: ' '.join(tokens))
+
+# Preparar el dataframe final
+df_final = df[['target', 'texto_limpio']].rename(columns={'texto_limpio': 'text'})
+
+# Mezclar y dividir
+df_final = df_final.sample(frac=1, random_state=42).reset_index(drop=True)
+train_size = int(0.8 * len(df_final))
+df_train = df_final[:train_size]
+df_test = df_final[train_size:]
+
+# Guardar a CSV
+df_train.to_csv('tweets_entrenamiento.csv', index=False)
+df_test.to_csv('tweets_prueba.csv', index=False)
+
+print("✅ ¡Todo listo!")
+print(f"   - Entrenamiento: {len(df_train)} registros")
+print(f"   - Prueba: {len(df_test)} registros")
+print("📁 Archivos guardados: 'tweets_entrenamiento.csv' y 'tweets_prueba.csv'")
