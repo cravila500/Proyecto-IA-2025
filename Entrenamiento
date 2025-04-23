@@ -1,0 +1,40 @@
+import pandas as pd
+import math
+from collections import defaultdict, Counter
+
+# Leer los datos ya limpios
+df_train = pd.read_csv('tweets_entrenamiento.csv')
+
+# Contadores
+conteo_clases = defaultdict(int)              # Ej: {'positivo': 300000, ...}
+conteo_palabras_clase = defaultdict(Counter)  # Ej: {'positivo': {'love': 1234, 'happy': 890, ...}, ...}
+total_palabras_clase = defaultdict(int)       # Ej: {'positivo': 567890, ...}
+vocabulario = set()
+
+# Entrenamiento
+for _, fila in df_train.iterrows():
+    clase = fila['target']
+    palabras = fila['text'].split()
+
+    conteo_clases[clase] += 1
+    for palabra in palabras:
+        conteo_palabras_clase[clase][palabra] += 1
+        total_palabras_clase[clase] += 1
+        vocabulario.add(palabra)
+
+# Calcular probabilidades P(clase) y preparar función para P(palabra|clase)
+total_tweets = sum(conteo_clases.values())
+prob_clases = {clase: conteo / total_tweets for clase, conteo in conteo_clases.items()}
+
+# Guardar el modelo como diccionario
+modelo_naive = {
+    'prob_clases': prob_clases,
+    'conteo_palabras': dict(conteo_palabras_clase),
+    'total_palabras': dict(total_palabras_clase),
+    'vocabulario': vocabulario,
+    'total_tweets': total_tweets
+}
+
+print("✅ Modelo Naïve Bayes entrenado desde cero.")
+print(f"Clases detectadas: {list(prob_clases.keys())}")
+print(f"Total de palabras únicas: {len(vocabulario)}")
